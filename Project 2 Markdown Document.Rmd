@@ -1,0 +1,200 @@
+---
+title: "Reproducible Data Project 2"
+author: "N Nedd"
+date: "January 24, 2015"
+output: html_document
+---
+
+#The Economic and Health effects of severe weather events across the United States
+This project explored the Storm Data database of the National Weather Service to answer two basic questions about the effects of severe weather events.  Data from 1996 to 2011 wll be used since these years contain the most complete data.  The first part of the project seeks to ascertain those severe weather events that are most harmful to the health of the population.  The fatalities and injuries incurred by these events will be examined here.  The second part of the project seeks to ascertain which severe weather events have the greatest economic consequences.  Property and crop damage incurred by these events will be examined.  This project assumes that the compressed data file "repdata_data_StormData.csv.bz2" is stored in the  working directory.
+
+#Loaded Libraries
+```{r}
+library(dplyr)
+library(lubridate)
+```
+
+#Data Processing
+
+##Loading the Data
+The compressed file was read and loaded into the stormData Variable with stringsAsFactors set to FALSE.
+
+```{r}
+stormData <- read.csv("repdata_data_StormData.csv.bz2", header=TRUE, sep=",", stringsAsFactors = FALSE)
+```
+
+
+##Cleaning the Data
+The Date variable was created to format the BGN_DATE variable as a date.  This will be used as the date of the occurrence of the severe storm weather event. The thinking is that the weather occurrence date will be taken as the day the occurrence began.
+
+```{r}
+stormData2 <- mutate(stormData, Date = mdy_hms(BGN_DATE))
+```
+
+Only a subset of the data will be used for the analysis.  According to the National Climatic Data Centre (https://www.ncdc.noaa.gov/stormevents/details.jsp) only the data from 1996 to 2011 is complete.  Therefore, only this data will be used for the analysis for this project.
+
+```{r}
+selectData <- filter(stormData2, year(Date)>= 1996 & year(Date)<=2011)
+```
+
+It is assumed that the PROPDMGEXP and CROPDMGEXP is the multiplier for the PROPDMG and CROPDMG fields respectively.  Therefore the data was adjusted as follows:
+
+    - K was converted to 1000
+    - B was converted to 1000000000
+    - M was converted to 1000000
+    - other values  were converted to 1
+    
+    
+```{r}
+    selectData$PROPDMGEXP[selectData$PROPDMGEXP == "K"] <- 1000
+    selectData$PROPDMGEXP[selectData$PROPDMGEXP == "B"] <- 1000000000
+    selectData$PROPDMGEXP[selectData$PROPDMGEXP == "M"] <- 1000000
+    selectData$PROPDMGEXP[selectData$PROPDMGEXP == ""] <- 1
+    selectData$PROPDMGEXP[selectData$PROPDMGEXP == "0"] <- 1
+    selectData$CROPDMGEXP[selectData$CROPDMGEXP == "K"] <- 1000
+    selectData$CROPDMGEXP[selectData$CROPDMGEXP == "B"] <- 1000000000
+    selectData$CROPDMGEXP[selectData$CROPDMGEXP == "M"] <- 1000000
+    selectData$CROPDMGEXP[selectData$CROPDMGEXP == ""] <- 1
+```
+
+The PROPDMGEXP and CROPDMGEXP fields were then converted to numeric
+```{r}
+    selectData$PROPDMGEXP <- as.numeric(selectData$PROPDMGEXP)
+    selectData$CROPDMGEXP <- as.numeric(selectData$CROPDMGEXP)
+```
+
+
+
+
+##Population health data preparation
+The following formula will be used to represent population health.  
+fatilities + injuries.  
+
+```{r}
+newData <- mutate(selectData, health = FATALITIES + INJURIES)
+```
+
+All records with a health of 0 is removed:
+
+```{r}
+healthData <- filter(newData, health != 0)
+```
+
+The data is then cleaned by manually rectifying some key event labels with those that are offically recognised according to the data collection agency.  After this combining, the events with the higest affect on population should be identified. Note that only those events that had a high impact on health were considered for rectification.
+
+```{r}
+healthData$EVENT <- healthData$EVTYPE
+healthData$EVENT <- toupper(healthData$EVENT)
+healthData$EVENT[grepl("TSTM", healthData$EVENT)] <- "THUNDERSTORM WIND"
+healthData$EVENT[grepl("THUNDERSTORM", healthData$EVENT)] <- "THUNDERSTORM WIND"
+healthData$EVENT[grepl("RIP CURRENTS", healthData$EVENT)] <- "RIP CURRENT"
+healthData$EVENT[grepl("EXTREME COLD", healthData$EVENT)] <- "EXTREME COLD/WIND CHILL"
+healthData$EVENT[grepl("EXTREME WINDCHILL", healthData$EVENT)] <- "EXTREME COLD/WIND CHILL"
+healthData$EVENT[grepl("COLD/WIND CHILL", healthData$EVENT)] <- "EXTREME COLD/WIND CHILL"
+healthData$EVENT[grepl("FOG", healthData$EVENT)] <- "DENSE FOG"
+healthData$EVENT[grepl("HURRICANE", healthData$EVENT)] <- "HURRICANE (TYPHOON)"
+healthData$EVENT[grepl("WILD/FOREST FIRE", healthData$EVENT)] <- "WILDFIRE"
+
+```
+
+##Economic Consequences data preparation
+The following formula will be used to represent economic consequences
+PROPDMG * PROPDMGEXP + CROPDMG * CROPDMGEXP
+
+```{r}
+newData <- mutate(newData, economic = PROPDMG * PROPDMGEXP + CROPDMG * CROPDMGEXP)
+```
+
+All records with economic = 0 removed.
+
+```{r}
+economicData <- filter(newData, economic !=0)
+```
+
+The data is then cleaned by manually rectifying some key events with those that are offically recognised according to the data collection agency.  After this combining, the events with the higest affect on population should be identified.  Note that only those events that had a high economic consequence were considered for rectification.
+
+```{r}
+economicData$EVENT <- economicData$EVTYPE
+economicData$EVENT <- toupper(economicData$EVENT)
+economicData$EVENT[grepl("TSTM", economicData$EVENT)] <- "THUNDERSTORM WIND"
+economicData$EVENT[grepl("THUNDERSTORM", economicData$EVENT)] <- "THUNDERSTORM WIND"
+economicData$EVENT[grepl("RIP CURRENTS", economicData$EVENT)] <- "RIP CURRENT"
+economicData$EVENT[grepl("EXTREME COLD", economicData$EVENT)] <- "EXTREME COLD/WIND CHILL"
+economicData$EVENT[grepl("EXTREME WINDCHILL", economicData$EVENT)] <- "EXTREME COLD/WIND CHILL"
+economicData$EVENT[grepl("COLD/WIND CHILL", economicData$EVENT)] <- "EXTREME COLD/WIND CHILL"
+economicData$EVENT[grepl("FOG", economicData$EVENT)] <- "DENSE FOG"
+economicData$EVENT[grepl("HURRICANE", economicData$EVENT)] <- "HURRICANE (TYPHOON)"
+economicData$EVENT[grepl("TYPHOON", economicData$EVENT)] <- "HURRICANE (TYPHOON)"
+economicData$EVENT[grepl("WILD/FOREST FIRE", economicData$EVENT)] <- "WILDFIRE"
+economicData$EVENT[grepl("STORM SURGE", economicData$EVENT)] <- "STORM SURGE/TIDE"
+economicData$EVENT[grepl("FREEZE", economicData$EVENT)] <- "FROST/FREEZE"
+```
+
+
+#Results
+
+##Across the United States, which types of events are most harmful with respect to population health
+
+####First the data is summarised
+```{r}
+healthData$EVENT <- as.factor(healthData$EVENT)
+healthSummary <- aggregate(healthData$health, by=list(Category=healthData$EVENT), FUN=sum, na.rm=TRUE)
+print(healthSummary)
+```
+
+
+####Sort and Choose the top ten occurrences
+```{r}
+healthSummarySorted <- arrange(healthSummary, desc(x))
+selectedHealthSummary <- healthSummarySorted[1:10,]
+```
+
+####Plot the graph
+The graph shows the top ten events that have the highest impact on health
+```{r healthplot}
+
+
+par(mar=c(15,6,4,2)) 
+mgp=c(2,5,1)
+
+barplot(selectedHealthSummary$x, las=2,col="green", main="Top Ten Events that affect health",
+        xlab="", ylab="", names.arg=selectedHealthSummary$Category)
+mtext("Event", side=1, line = 10)
+mtext("Number of Injuries and Fatalities", side=2, line=4)
+
+```
+
+##Across the United States, which types of events are most harmful with respect to the economy
+
+####First the data is summarised
+```{r}
+economicData$EVENT <- as.factor(economicData$EVENT)
+economicSummary <- aggregate(economicData$economic, by=list(Category=economicData$EVENT), FUN=sum, na.rm=TRUE)
+print(economicSummary)
+```
+
+
+####Sort and Choose the top ten occurrences
+```{r}
+economicSummarySorted <- arrange(economicSummary, desc(x))
+selectedEconomicSummary <- economicSummarySorted[1:10,]
+selectedEconomicSummary$y <- selectedEconomicSummary$x/10000000000
+```
+
+
+####Plot the graph
+The graph shows the top ten events that have an impact on the economy
+```{r economicplot}
+
+
+par(mar=c(15,10,4,2)) 
+mgp=c(2,5,1)
+options(scipen=5)
+
+barplot(selectedEconomicSummary$y, las=2,col="green", main="Top Ten Events that affect the economy",
+        xlab="", ylab="", names.arg=selectedEconomicSummary$Category)
+mtext("Event", side=1, line = 10)
+mtext("Economic Effect (in 10,000,000,000 dollars)", side=2, line=4)
+
+```
+
